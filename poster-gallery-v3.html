@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Poster Gallery — Concept</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { 
+    background: #E7E7E7; 
+    overflow: hidden; 
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  #c { width: 100vw; height: 100vh; display: block; user-select: none; -webkit-user-select: none; }
+  
+  .id { position: fixed; z-index: 10; font-size: 13px; font-weight: 400; color: rgba(26,26,26,0.5); transition: color 0.5s cubic-bezier(0.25, 0.1, 0.25, 1); text-decoration: none; }
+  .id:hover { color: rgba(26,26,26,1); }
+  .logo { position: fixed; top: 28px; left: 50%; transform: translateX(-50%); z-index: 10; font-size: 15px; font-weight: 500; letter-spacing: 0.08em; color: rgba(26,26,26,0.85); text-decoration: none; transition: color 0.5s cubic-bezier(0.25, 0.1, 0.25, 1); }
+  .logo:hover { color: rgba(26,26,26,1); }
+  .footer { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; font-size: 11px; font-weight: 400; letter-spacing: 0.03em; color: rgba(26,26,26,0.35); pointer-events: none; white-space: nowrap; }
+  .arrow { position: fixed; top: 50%; transform: translateY(-50%); z-index: 8; font-size: 28px; font-weight: 200; color: rgba(26,26,26,0); pointer-events: none; transition: color 0.6s cubic-bezier(0.25, 0.1, 0.25, 1); font-family: "Helvetica Neue", Helvetica, sans-serif; }
+  .arrow-l { left: 28px; }
+  .arrow-r { right: 28px; }
+  .hint { position: fixed; bottom: 44px; left: 50%; transform: translateX(-50%); font-size: 11px; color: rgba(26,26,26,0.25); letter-spacing: 0.05em; pointer-events: none; transition: opacity 1.2s cubic-bezier(0.25, 0.1, 0.25, 1); }
+
+  .modal-bg {
+    position: fixed; top:0; left:0; width:100vw; height:100vh;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    z-index: 100;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+    cursor: pointer;
+    perspective: 1000px;
+  }
+  .modal-bg.open { opacity: 1; pointer-events: all; }
+  .modal-img {
+    height: 72vh; max-width: 80vw; aspect-ratio: 3/4;
+    overflow: hidden; position: relative;
+    transform-style: preserve-3d;
+    will-change: transform;
+    box-shadow: none;
+  }
+  .modal-pan {
+    width: 100%; height: 100%; position: absolute; top: 0; left: 0;
+    background-size: cover; background-position: center;
+    pointer-events: none;
+  }
+  .modal-glare {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 2; opacity: 0;
+    background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 55%);
+  }
+  .modal-meta {
+    text-align: center; margin-top: 20px;
+    opacity: 0; transform: translateY(12px);
+    transition: opacity 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) 0.25s, transform 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) 0.25s;
+  }
+  .modal-bg.open .modal-meta { opacity: 1; transform: translateY(0); }
+  .modal-t { font-size: 18px; font-weight: 400; color: #fff; letter-spacing: 0.02em; }
+  .modal-d { font-size: 13px; font-weight: 300; color: rgba(255,255,255,0.6); margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<a class="logo" href="#">jsantoscreates</a>
+<div class="footer">designed & developed by jsantoscreates © 2024</div>
+<div class="arrow arrow-l" id="arL">‹</div>
+<div class="arrow arrow-r" id="arR">›</div>
+<div class="hint" id="hint">drag to explore · scroll to navigate vertically</div>
+
+<div class="modal-bg" id="modal">
+  <div class="modal-img" id="mImg">
+    <div class="modal-pan" id="mPan"></div>
+    <div class="modal-glare" id="mGlare"></div>
+  </div>
+  <div class="modal-meta">
+    <div class="modal-t" id="mT"></div>
+    <div class="modal-d" id="mD"></div>
+  </div>
+</div>
+
+<script>
+// =============================================
+// CYLINDRICAL POSTER GALLERY — CONCEPT v3
+// =============================================
+
+// --- Inline minimal Three.js-like renderer using WebGL directly? No, let's use Three.js but fix the issues ---
+
+// Since CDN might have issues, let's create our own Three.js scene manually
+// Actually let's just use the CDN but fix the geometry
+
+const script = document.createElement('script');
+script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+script.onload = init;
+document.head.appendChild(script);
+
+function init() {
+  const TITLES = [
+    'Meridian','Nocturne','Vertex','Solstice','Cascade',
+    'Prism','Zenith','Drift','Ember','Haze',
+    'Fracture','Bloom','Monolith','Ripple','Stratum',
+    'Veil','Arc','Pulse','Grain','Echo',
+    'Fold','Trace','Void','Flux','Horizon',
+    'Glyph','Shard','Mist','Thorn','Dusk',
+  ];
+  const DATES = ['2024','2024','2023','2024','2023','2022','2024','2023','2024','2022','2023','2024','2021','2023','2024','2022','2024','2023','2021','2024','2023','2022','2024','2023','2024','2022','2023','2024','2021','2024'];
+  const COUNT = 30;
+  const COLS = 12;
+  const ROWS = Math.ceil(COUNT / COLS); // 3
+  const RADIUS = 350;
+  const PW = 90, PH = 122, GAP_Y = 28;
+  const ROW_H = PH + GAP_Y;
+  const TOTAL_H = ROWS * ROW_H;
+  const ANG_PER_COL = (2 * Math.PI) / COLS;
+  const DAMP = 0.975;
+  const S_DAMP = 0.975;
+  const TILES = 11; // vertical tile repeats
+
+  // --- Poster texture generator ---
+  function makeTex(i) {
+    const cv = document.createElement('canvas');
+    cv.width = 360; cv.height = 480;
+    const c = cv.getContext('2d');
+    
+    // Base - varied greys
+    const bg = 200 + (i * 7 % 40) - 20;
+    c.fillStyle = `rgb(${bg},${bg},${bg})`;
+    c.fillRect(0, 0, 360, 480);
+
+    const s = i % 6;
+    const fg = bg - 55 - (i % 3) * 10;
+
+    if (s === 0) {
+      // Big letter
+      c.fillStyle = `rgb(${fg},${fg},${fg})`;
+      c.font = '900 140px Helvetica Neue, Helvetica, sans-serif';
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText('Aa', 180, 210);
+      c.fillRect(110, 310, 140, 2);
+      c.font = '300 14px Helvetica Neue, Helvetica, sans-serif';
+      c.fillText(TITLES[i].toUpperCase(), 180, 345);
+    } else if (s === 1) {
+      // Circles
+      c.strokeStyle = `rgb(${fg},${fg},${fg})`;
+      c.lineWidth = 1.5;
+      for (let j = 0; j < 5; j++) { c.beginPath(); c.arc(180, 220, 35 + j * 32, 0, Math.PI * 2); c.stroke(); }
+      c.fillStyle = `rgb(${fg},${fg},${fg})`;
+      c.beginPath(); c.arc(180, 220, 16, 0, Math.PI * 2); c.fill();
+    } else if (s === 2) {
+      // Gradient block (photo sim)
+      const g = c.createLinearGradient(0, 0, 0, 480);
+      g.addColorStop(0, `rgb(${fg},${fg},${fg})`);
+      g.addColorStop(0.65, `rgb(${fg + 35},${fg + 35},${fg + 35})`);
+      g.addColorStop(1, `rgb(${bg - 10},${bg - 10},${bg - 10})`);
+      c.fillStyle = g;
+      c.fillRect(25, 25, 310, 340);
+      c.fillStyle = `rgb(${fg + 15},${fg + 15},${fg + 15})`;
+      c.font = '400 13px Helvetica Neue, Helvetica, sans-serif';
+      c.textAlign = 'left';
+      c.fillText(TITLES[i], 25, 405);
+      c.font = '300 11px Helvetica Neue, Helvetica, sans-serif';
+      c.fillText(DATES[i], 25, 425);
+    } else if (s === 3) {
+      // Lines
+      c.strokeStyle = `rgb(${fg},${fg},${fg})`;
+      c.lineWidth = 1;
+      for (let j = 0; j < 12; j++) {
+        const yy = 60 + j * 30;
+        c.beginPath(); c.moveTo(30 + (j * 37 % 100), yy); c.lineTo(330 - (j * 23 % 80), yy); c.stroke();
+      }
+      c.fillStyle = `rgb(${fg},${fg},${fg})`;
+      c.beginPath(); c.arc(180, 440, 4, 0, Math.PI * 2); c.fill();
+    } else if (s === 4) {
+      // Block grid
+      for (let r = 0; r < 5; r++) for (let cc = 0; cc < 4; cc++) {
+        if (((r + cc + i) % 3) !== 0) {
+          const sh = fg + ((r * cc * i) % 25);
+          c.fillStyle = `rgb(${sh},${sh},${sh})`;
+          c.fillRect(25 + cc * 82, 35 + r * 82, 68, 68);
+        }
+      }
+    } else {
+      // Triangle
+      c.fillStyle = `rgb(${fg},${fg},${fg})`;
+      c.beginPath(); c.moveTo(180, 60); c.lineTo(310, 320); c.lineTo(50, 320); c.closePath(); c.fill();
+      c.font = '700 26px Helvetica Neue, Helvetica, sans-serif';
+      c.textAlign = 'center';
+      c.fillText(TITLES[i].toUpperCase(), 180, 395);
+      c.fillRect(130, 410, 100, 1);
+    }
+
+    // Grain
+    const id = c.getImageData(0, 0, 360, 480);
+    const d = id.data;
+    for (let j = 0; j < d.length; j += 4) {
+      const n = (Math.random() - 0.5) * 14;
+      d[j] += n; d[j + 1] += n; d[j + 2] += n;
+    }
+    c.putImageData(id, 0, 0);
+    return cv;
+  }
+
+  // Pre-gen textures
+  const canvases = [];
+  const textures = [];
+  for (let i = 0; i < COUNT; i++) {
+    const cv = makeTex(i);
+    canvases.push(cv);
+    const t = new THREE.CanvasTexture(cv);
+    t.minFilter = THREE.LinearFilter;
+    t.magFilter = THREE.LinearFilter;
+    textures.push(t);
+  }
+
+  // --- Scene ---
+  const canvas = document.getElementById('c');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0xE7E7E7);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 1, 3000);
+  camera.position.set(0, 0, 0);
+
+  // --- Build cylinder of posters ---
+  const meshes = [];
+  const group = new THREE.Group();
+  scene.add(group);
+
+  const tiledRows = ROWS * TILES;
+
+  for (let tile = 0; tile < TILES; tile++) {
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) {
+        const pi = (row * COLS + col) % COUNT;
+        const gRow = tile * ROWS + row;
+
+        const angle = col * ANG_PER_COL + (row % 2 === 1 ? ANG_PER_COL * 0.5 : 0);
+        const y = (gRow - (tiledRows - 1) / 2) * ROW_H;
+        const x = RADIUS * Math.sin(angle);
+        const z = RADIUS * Math.cos(angle);
+
+        const geo = new THREE.PlaneGeometry(PW, PH);
+        const mat = new THREE.MeshBasicMaterial({
+          map: textures[pi],
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0,
+        });
+
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(x, y, z);
+
+        // Make poster face the center (camera)
+        m.lookAt(0, y, 0);
+
+        m.userData = { pi, title: TITLES[pi], date: DATES[pi], cv: canvases[pi] };
+        group.add(m);
+        meshes.push(m);
+      }
+    }
+  }
+
+  // --- State ---
+  let rotSpd = 0, angle = 0, scrollY = 0, sSpd = 0, mx = 0.5, my = 0.5, modalOpen = false;
+  const t0 = Date.now();
+
+  // --- Fade in ---
+  function fadeIn() {
+    const el = (Date.now() - t0) / 1000;
+    for (let i = 0; i < meshes.length; i++) {
+      const m = meshes[i];
+      if (m.material.opacity < 1) {
+        const delay = (i % COUNT) * 0.07;
+        const t = Math.max(0, el - delay);
+        m.material.opacity = Math.min(1, t * 1.2);
+      }
+    }
+  }
+
+  // --- Mouse: Drag navigation (primary) + subtle edge drift (secondary) ---
+  let hintGone = false;
+  const arL = document.getElementById('arL');
+  const arR = document.getElementById('arR');
+  let isDragging = false, dragStartX = 0, dragStartY = 0, dragMoved = false;
+  const EDGE_ZONE = 0.85; // only very edge of screen triggers drift
+  const DRIFT_SPD = 0.08; // very slow drift
+
+  // Track mouse position for edge drift + cursor
+  document.addEventListener('mousemove', e => {
+    if (modalOpen) return;
+    mx = e.clientX / window.innerWidth;
+    my = e.clientY / window.innerHeight;
+    
+    if (!hintGone) {
+      document.getElementById('hint').style.opacity = '0';
+      hintGone = true;
+    }
+
+    // Drag
+    if (isDragging) {
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragMoved = true;
+      // Apply directly to position (softer)
+      angle -= dx * 0.0012;
+      scrollY += dy * 0.15;
+      // Store velocity for momentum on release
+      rotSpd = -dx * 0.0008;
+      sSpd = dy * 0.12;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+    }
+
+    // Subtle arrow hints at edges
+    const nx = (mx - 0.5) * 2;
+    if (nx < -EDGE_ZONE) {
+      arL.style.color = 'rgba(26,26,26,0.15)';
+      arR.style.color = 'rgba(26,26,26,0)';
+    } else if (nx > EDGE_ZONE) {
+      arR.style.color = 'rgba(26,26,26,0.15)';
+      arL.style.color = 'rgba(26,26,26,0)';
+    } else {
+      arL.style.color = 'rgba(26,26,26,0)';
+      arR.style.color = 'rgba(26,26,26,0)';
+    }
+  });
+
+  // Drag start
+  canvas.addEventListener('mousedown', e => {
+    if (modalOpen) return;
+    e.preventDefault();
+    isDragging = true;
+    dragMoved = false;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    canvas.style.cursor = 'grabbing';
+  });
+
+  // Drag end
+  document.addEventListener('mouseup', () => {
+    isDragging = false;
+    if (!modalOpen) canvas.style.cursor = 'grab';
+  });
+
+  // Wheel scroll (kept)
+  document.addEventListener('wheel', e => {
+    if (modalOpen) return;
+    sSpd += e.deltaY * 0.004;
+  }, { passive: true });
+
+  // --- Click (only if not dragged) ---
+  const rc = new THREE.Raycaster();
+  const mv = new THREE.Vector2();
+
+  canvas.addEventListener('click', e => {
+    if (modalOpen || dragMoved) return;
+    mv.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mv.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    rc.setFromCamera(mv, camera);
+    const hits = rc.intersectObjects(meshes);
+    if (hits.length > 0) openModal(hits[0].object);
+  });
+
+  // Default cursor
+  canvas.style.cursor = 'grab';
+
+  // --- Modal ---
+  const modal = document.getElementById('modal');
+  const mPan = document.getElementById('mPan');
+  const mImg = document.getElementById('mImg');
+  const mT = document.getElementById('mT');
+  const mD = document.getElementById('mD');
+
+  function openModal(m) {
+    modalOpen = true;
+    const d = m.userData;
+    mPan.style.backgroundImage = `url(${d.cv.toDataURL()})`;
+    mT.textContent = d.title;
+    mD.textContent = d.date;
+    modal.classList.add('open');
+  }
+  const mGlare = document.getElementById('mGlare');
+  function closeModal() { 
+    modalOpen = false; 
+    modal.classList.remove('open'); 
+    panTargetX = 0; panTargetY = 0; glareX = 50; glareY = 50; glareOpacity = 0;
+    mImg.style.transform = '';
+    mGlare.style.opacity = '0';
+    mGlare.style.background = '';
+    canvas.style.cursor = 'grab';
+  }
+
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  // 3D tilt state
+  let panTargetX = 0, panTargetY = 0, panX = 0, panY = 0;
+  let glareX = 50, glareY = 50, glareOpacity = 0;
+
+  mImg.addEventListener('mousemove', e => {
+    if (!modalOpen) return;
+    const r = mImg.getBoundingClientRect();
+    const rx = ((e.clientX - r.left) / r.width - 0.5) * 2;  // -1 to 1
+    const ry = ((e.clientY - r.top) / r.height - 0.5) * 2;
+    panTargetX = -ry * 14;
+    panTargetY = rx * 14;
+    // Glare follows mouse position
+    glareX = (rx + 1) / 2 * 100;
+    glareY = (ry + 1) / 2 * 100;
+    glareOpacity = 0.2;
+  });
+  mImg.addEventListener('mouseleave', () => {
+    panTargetX = 0; panTargetY = 0;
+    glareOpacity = 0;
+  });
+
+  // --- Touch ---
+  let tx = 0, ty = 0;
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: false });
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (modalOpen) return;
+    const dx = e.touches[0].clientX - tx, dy = e.touches[0].clientY - ty;
+    angle -= dx * 0.0012;
+    scrollY += dy * 0.15;
+    rotSpd = -dx * 0.0008;
+    sSpd = dy * 0.12;
+    tx = e.touches[0].clientX; ty = e.touches[0].clientY;
+  }, { passive: false });
+  canvas.addEventListener('touchend', () => {});
+
+  // --- Animate ---
+  function loop() {
+    requestAnimationFrame(loop);
+
+    if (!modalOpen) {
+      const nx = (mx - 0.5) * 2;
+      const ny = (my - 0.5) * 2;
+      const ax = Math.abs(nx);
+      const ay = Math.abs(ny);
+
+      // Subtle edge drift (decorative, very slow)
+      if (!isDragging) {
+        if (ax > EDGE_ZONE) {
+          const f = (ax - EDGE_ZONE) / (1 - EDGE_ZONE);
+          rotSpd += Math.sign(nx) * f * DRIFT_SPD * 0.016;
+        }
+        if (ay > EDGE_ZONE) {
+          const f = (ay - EDGE_ZONE) / (1 - EDGE_ZONE);
+          sSpd += Math.sign(ny) * f * DRIFT_SPD * 0.5;
+        }
+
+        // Apply momentum + damping (only when not dragging)
+        rotSpd *= DAMP;
+        sSpd *= S_DAMP;
+        angle += rotSpd * 0.04;
+        scrollY += sSpd * 0.5;
+      }
+      scrollY = ((scrollY % TOTAL_H) + TOTAL_H) % TOTAL_H;
+
+      // Rotate camera around Y
+      camera.position.x = 0;
+      camera.position.z = 0;
+      camera.rotation.set(0, 0, 0);
+      camera.rotateY(-angle);
+
+      // Vertical offset
+      group.position.y = scrollY;
+
+      // Tile wrap
+      const half = (tiledRows * ROW_H) / 2;
+      for (const m of meshes) {
+        const wy = m.position.y + group.position.y;
+        if (wy > half) m.position.y -= tiledRows * ROW_H;
+        else if (wy < -half) m.position.y += tiledRows * ROW_H;
+      }
+
+      // Cursor: pointer on poster hover when not dragging
+      if (!isDragging) {
+        mv.x = mx * 2 - 1;
+        mv.y = -(my * 2 - 1);
+        rc.setFromCamera(mv, camera);
+        canvas.style.cursor = rc.intersectObjects(meshes).length > 0 ? 'pointer' : 'grab';
+      }
+    }
+
+    fadeIn();
+
+    // Smooth 3D tilt for modal
+    if (modalOpen) {
+      panX += (panTargetX - panX) * 0.045;
+      panY += (panTargetY - panY) * 0.045;
+      mImg.style.transform = `rotateX(${panX}deg) rotateY(${panY}deg)`;
+      
+      // Glare
+      const currentGlareOpacity = parseFloat(mGlare.style.opacity || 0);
+      const newGlareOpacity = currentGlareOpacity + (glareOpacity - currentGlareOpacity) * 0.04;
+      mGlare.style.opacity = newGlareOpacity;
+      mGlare.style.background = `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 55%)`;
+    }
+
+    renderer.render(scene, camera);
+  }
+  loop();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+}
+</script>
+</body>
+</html>
