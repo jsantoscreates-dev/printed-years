@@ -41,7 +41,7 @@ export const PosterMesh = forwardRef<Mesh, PosterMeshProps>(
       return new PlaneGeometry(width, height);
     }, [textureResult]);
 
-    // Fade-in animation with ease-in curve
+    // Fade-in animation with ease-out curve (smooth settle)
     useFrame(() => {
       if (!materialRef.current || loadTimeRef.current === null) return;
 
@@ -51,8 +51,8 @@ export const PosterMesh = forwardRef<Mesh, PosterMeshProps>(
       const elapsed = (performance.now() - loadTimeRef.current) / 1000;
       // Progress from 0 to 1
       const progress = Math.min(1, elapsed * ANIMATION.fadeInSpeed);
-      // Apply ease-in curve (cubic): starts slow, accelerates
-      const eased = progress * progress * progress;
+      // Apply ease-out curve (cubic): starts fast, settles smoothly
+      const eased = 1 - Math.pow(1 - progress, 3);
       material.opacity = eased;
     });
 
