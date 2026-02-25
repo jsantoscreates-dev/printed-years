@@ -39,7 +39,7 @@ export function Gallery() {
         dpr={[1, 2]}
       >
         <color attach="background" args={['#050505']} />
-        <CylinderGrid onPosterClick={handlePosterClick} isMobile={isMobile} />
+        <CylinderGrid onPosterClick={handlePosterClick} isMobile={isMobile} isModalOpen={isModalOpen} />
       </Canvas>
 
       <Overlay isModalOpen={isModalOpen} />

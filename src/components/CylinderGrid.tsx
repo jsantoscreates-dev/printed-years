@@ -20,9 +20,10 @@ interface PosterPosition {
 interface CylinderGridProps {
   onPosterClick?: (poster: PosterData) => void;
   isMobile?: boolean;
+  isModalOpen?: boolean;
 }
 
-export function CylinderGrid({ onPosterClick, isMobile = false }: CylinderGridProps) {
+export function CylinderGrid({ onPosterClick, isMobile = false, isModalOpen = false }: CylinderGridProps) {
   const groupRef = useRef<Group>(null);
   const meshRefs = useRef<Map<string, Mesh>>(new Map());
   const { gl, camera } = useThree();
@@ -31,8 +32,8 @@ export function CylinderGrid({ onPosterClick, isMobile = false }: CylinderGridPr
   const raycaster = useRef(new Raycaster());
   const mouse = useRef(new Vector2());
 
-  // Navigation hook
-  const { update, state } = useDragNavigation(gl.domElement);
+  // Navigation hook - disabled when modal is open
+  const { update, state } = useDragNavigation(gl.domElement, isModalOpen);
 
   // Grid calculations - use fewer columns on mobile
   const {

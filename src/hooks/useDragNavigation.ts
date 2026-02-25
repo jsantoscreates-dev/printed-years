@@ -14,7 +14,7 @@ interface DragNavigationState {
   mouseY: number;
 }
 
-export function useDragNavigation(canvas: HTMLCanvasElement | null) {
+export function useDragNavigation(canvas: HTMLCanvasElement | null, disabled: boolean = false) {
   const state = useRef<DragNavigationState>({
     angle: 0,
     scrollY: 0,
@@ -145,6 +145,19 @@ export function useDragNavigation(canvas: HTMLCanvasElement | null) {
   const update = useCallback(() => {
     const s = state.current;
 
+    // When disabled (modal open), stop all movement and momentum
+    if (disabled) {
+      s.rotSpd = 0;
+      s.sSpd = 0;
+      s.isDragging = false;
+      return {
+        angle: s.angle,
+        scrollY: s.scrollY,
+        isDragging: false,
+        dragMoved: false,
+      };
+    }
+
     if (!s.isDragging) {
       // Normalized mouse position (-1 to 1)
       const nx = (s.mouseX - 0.5) * 2;
@@ -178,7 +191,7 @@ export function useDragNavigation(canvas: HTMLCanvasElement | null) {
       isDragging: s.isDragging,
       dragMoved: s.dragMoved,
     };
-  }, [totalHeight]);
+  }, [totalHeight, disabled]);
 
   const resetDragMoved = useCallback(() => {
     state.current.dragMoved = false;
