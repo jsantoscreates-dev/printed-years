@@ -88,20 +88,28 @@ export function CylinderGrid({ onPosterClick, isMobile = false, isModalOpen = fa
       }
     }
 
-    // Sort: center row first, then expand outward; within each row, left to right
-    // Use stable sort with id as final tie-breaker to prevent position swapping
+    // Sort: left to right (by angle), then by Y distance from center
+    // This creates a sequential left-to-right appearance in the viewport
     items.sort((a, b) => {
-      const yDiff = Math.abs(a.position[1]) - Math.abs(b.position[1]);
-      // If same row (similar Y), sort by angle (left to right)
-      if (Math.abs(yDiff) < rowHeight * 0.5) {
+      // First: prioritize items close to center (viewport)
+      const aInView = Math.abs(a.position[1]) < rowHeight * 2;
+      const bInView = Math.abs(b.position[1]) < rowHeight * 2;
+
+      if (aInView && !bInView) return -1;
+      if (!aInView && bInView) return 1;
+
+      // Within viewport: sort by angle (left to right)
+      if (aInView && bInView) {
         const rotDiff = a.rotation - b.rotation;
-        // Use id as stable tie-breaker when rotations are equal
-        if (Math.abs(rotDiff) < 0.0001) {
-          return a.id.localeCompare(b.id);
-        }
-        return rotDiff;
+        if (Math.abs(rotDiff) > 0.0001) return rotDiff;
+        // Same angle: sort by Y distance
+        return Math.abs(a.position[1]) - Math.abs(b.position[1]);
       }
-      return yDiff;
+
+      // Outside viewport: sort by Y distance, then angle
+      const yDiff = Math.abs(a.position[1]) - Math.abs(b.position[1]);
+      if (Math.abs(yDiff) > rowHeight * 0.5) return yDiff;
+      return a.rotation - b.rotation;
     });
 
     return items;
