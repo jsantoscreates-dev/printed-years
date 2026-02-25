@@ -148,7 +148,7 @@ export function Modal({ poster, isOpen, onClose, isMobile = false }: ModalProps)
           {/* Poster with tilt effect (disabled on mobile) */}
           {isMobile ? (
             <div
-              className="relative overflow-hidden cursor-default"
+              className="relative overflow-hidden cursor-default flex items-center justify-center"
               style={{
                 height: MODAL.heightMobile,
                 maxWidth: MODAL.maxWidthMobile,
@@ -167,7 +167,7 @@ export function Modal({ poster, isOpen, onClose, isMobile = false }: ModalProps)
             </div>
           ) : (
             <HoverTilt
-              className="relative overflow-hidden cursor-default"
+              className="relative overflow-hidden cursor-default flex items-center justify-center"
               style={{
                 height: '72vh',
                 maxWidth: '80vw',
