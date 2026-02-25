@@ -35,7 +35,7 @@ export const MODAL = {
 
 export const ANIMATION = {
   fadeInDelay: 0.02,
-  fadeInSpeed: 2,
+  fadeInSpeed: 1.2,
   modalFadeDuration: 0.5,
   modalEasing: [0.25, 0.1, 0.25, 1] as const,
   metadataDelay: 0.25,
