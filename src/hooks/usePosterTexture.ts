@@ -14,7 +14,7 @@ interface TextureResult {
 
 const textureCache = new Map<string, TextureResult>();
 
-// Progressive loading queue - loads one texture at a time for smooth appearance
+// Parallel loading queue - loads multiple textures at once for faster startup
 type LoadRequest = {
   filename: string;
   posterIndex: number;
@@ -22,75 +22,72 @@ type LoadRequest = {
 };
 
 const loadQueue: LoadRequest[] = [];
-let isProcessing = false;
+let activeLoads = 0;
+const MAX_PARALLEL_LOADS = 6; // Load 6 textures at a time
 
 function processQueue() {
-  if (isProcessing || loadQueue.length === 0) return;
+  while (activeLoads < MAX_PARALLEL_LOADS && loadQueue.length > 0) {
+    const request = loadQueue.shift()!;
 
-  isProcessing = true;
-  const request = loadQueue.shift()!;
-
-  // Check cache first
-  const cached = textureCache.get(request.filename);
-  if (cached) {
-    request.resolve(cached);
-    isProcessing = false;
-    // Process next immediately
-    setTimeout(processQueue, 0);
-    return;
-  }
-
-  const thumbUrl = `/posters/thumb/${request.filename}`;
-
-  textureLoader.load(
-    thumbUrl,
-    (loadedTexture) => {
-      loadedTexture.minFilter = LinearFilter;
-      loadedTexture.magFilter = LinearFilter;
-
-      const image = loadedTexture.image as HTMLImageElement;
-      const aspectRatio = image.width / image.height;
-
-      // Store data URL for modal
-      const canvas = document.createElement('canvas');
-      canvas.width = image.width;
-      canvas.height = image.height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(image, 0, 0);
-        setTextureDataUrl(request.filename, canvas.toDataURL('image/jpeg', 0.9));
-      }
-
-      const textureResult: TextureResult = {
-        texture: loadedTexture,
-        aspectRatio,
-      };
-
-      textureCache.set(request.filename, textureResult);
-      request.resolve(textureResult);
-
-      isProcessing = false;
-      // Small delay between loads for smooth sequential appearance
-      setTimeout(processQueue, 30);
-    },
-    undefined,
-    () => {
-      const generated = generatePosterTexture(request.posterIndex);
-      const canvas = generated.image as HTMLCanvasElement;
-      setTextureDataUrl(request.filename, canvas.toDataURL('image/jpeg', 0.9));
-
-      const textureResult: TextureResult = {
-        texture: generated,
-        aspectRatio: 3 / 4,
-      };
-
-      textureCache.set(request.filename, textureResult);
-      request.resolve(textureResult);
-
-      isProcessing = false;
-      setTimeout(processQueue, 30);
+    // Check cache first
+    const cached = textureCache.get(request.filename);
+    if (cached) {
+      request.resolve(cached);
+      continue;
     }
-  );
+
+    activeLoads++;
+    const thumbUrl = `/posters/thumb/${request.filename}`;
+
+    textureLoader.load(
+      thumbUrl,
+      (loadedTexture) => {
+        loadedTexture.minFilter = LinearFilter;
+        loadedTexture.magFilter = LinearFilter;
+
+        const image = loadedTexture.image as HTMLImageElement;
+        const aspectRatio = image.width / image.height;
+
+        // Store data URL for modal
+        const canvas = document.createElement('canvas');
+        canvas.width = image.width;
+        canvas.height = image.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(image, 0, 0);
+          setTextureDataUrl(request.filename, canvas.toDataURL('image/jpeg', 0.9));
+        }
+
+        const textureResult: TextureResult = {
+          texture: loadedTexture,
+          aspectRatio,
+        };
+
+        textureCache.set(request.filename, textureResult);
+        request.resolve(textureResult);
+
+        activeLoads--;
+        processQueue();
+      },
+      undefined,
+      () => {
+        const generated = generatePosterTexture(request.posterIndex);
+        const canvas = generated.image as HTMLCanvasElement;
+        setTextureDataUrl(request.filename, canvas.toDataURL('image/jpeg', 0.9));
+
+        const textureResult: TextureResult = {
+          texture: generated,
+          aspectRatio: 3 / 4,
+        };
+
+        textureCache.set(request.filename, textureResult);
+        request.resolve(textureResult);
+
+        activeLoads--;
+        processQueue();
+      }
+    );
+  }
 }
 
 function queueTextureLoad(filename: string, posterIndex: number): Promise<TextureResult> {
@@ -132,5 +129,5 @@ export function usePosterTexture(posterIndex: number, filename: string): Texture
 // Reset queue (for hot reload)
 export function resetTextureQueue() {
   loadQueue.length = 0;
-  isProcessing = false;
+  activeLoads = 0;
 }
